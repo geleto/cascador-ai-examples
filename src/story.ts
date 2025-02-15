@@ -39,7 +39,7 @@ const mainGenerator = create.TemplateRenderer({
 		language: 'Spanish',
 	},
 	prompt: `
-    {% set synopsis = readFile('./synopsis.txt') %}
+    {% set synopsis = readFile('./src/synopsis.txt') %}
     {% set storyContent = (storylineGen({ synopsis: synopsis })).text %}
 	Story: {{ storyContent }}
     {% set critiqueContent = (critiqueGen({ story: storyContent })).text %}
