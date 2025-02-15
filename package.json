@@ -1,0 +1,44 @@
+{
+  "name": "cascador-ai-examples",
+  "version": "0.0.1",
+  "description": "Examples of Cascador-ai usage",
+  "keywords": [
+    "Cascador",
+    "ai",
+    "agent",
+    "examples"
+  ],
+  "homepage": "https://github.com/geleto/cascador-ai-examples#readme",
+  "bugs": {
+    "url": "https://github.com/geleto/cascador-ai-examples/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/geleto/cascador-ai-examples.git"
+  },
+  "license": "Apache-2.0",
+  "author": "Angel Popov",
+  "type": "module",
+  "main": "src/story.ts",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "tsc",
+    "start": "cd src && tsx story.ts && cd ..",
+    "dev": "tsc -w",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.4",
+    "@typescript-eslint/eslint-plugin": "^8.24.0",
+    "@typescript-eslint/parser": "^8.24.0",
+    "eslint": "^9.20.1",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3"
+  },
+  "dependencies": {
+    "@ai-sdk/anthropic": "^1.0.8",
+    "@ai-sdk/openai": "^1.0.18",
+    "ai": "^4.0.33"
+  }
+}
