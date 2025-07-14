@@ -52,47 +52,47 @@ const contentAgent = create.ScriptRunner({
 	},
 	script:
 		`// This script orchestrates the agent's "thought process".
-      :data
+		:data
 
-      // --- Generate and critique the initial draft ---
-      var currentDraft = draftGenerator({ topic: topic }).text
-      var critiqueResult = critiqueGenerator({ draft: currentDraft }).object
-      var qualityScore = critiqueResult.score
-      var suggestions = critiqueResult.suggestions
-      var revisionCount = 0
-      var break = false
+		// --- Generate and critique the initial draft ---
+		var currentDraft = draftGenerator({ topic: topic }).text
+		var critiqueResult = critiqueGenerator({ draft: currentDraft }).object
+		var qualityScore = critiqueResult.score
+		var suggestions = critiqueResult.suggestions
+		var revisionCount = 0
+		var break = false
 
-      // --- Start the revision loop ---
-      while (qualityScore < qualityThreshold or revisionCount < minRevisions) and revisionCount < maxRevisions and not break
-        var previousDraft = currentDraft
-        var previousScore = qualityScore
-        revisionCount = revisionCount + 1
+		// --- Start the revision loop ---
+		while (qualityScore < qualityThreshold or revisionCount < minRevisions) and revisionCount < maxRevisions and not break
+			var previousDraft = currentDraft
+			var previousScore = qualityScore
+			revisionCount = revisionCount + 1
 
-        // Revise the draft based on the latest suggestions
-        var revisedDraft = revisionGenerator({ draft: currentDraft, suggestions: suggestions }).text
+			// Revise the draft based on the latest suggestions
+			var revisedDraft = revisionGenerator({ draft: currentDraft, suggestions: suggestions }).text
 
-        // --- Critique the NEW revised draft ---
-        var newCritiqueResult = critiqueGenerator({ draft: revisedDraft }).object
-        var newScore = newCritiqueResult.score
+			// --- Critique the NEW revised draft ---
+			var newCritiqueResult = critiqueGenerator({ draft: revisedDraft }).object
+			var newScore = newCritiqueResult.score
 
-        // --- Decide whether to keep the revision ---
-        if newScore < previousScore
-          // Score got worse. Reject the revision and exit by forcing the loop to end.
-          break = true
-          revisionCount = revisionCount - 1
-        else
-          // Revision is an improvement. Accept it and update our state for the next loop.
-          currentDraft = revisedDraft
-          qualityScore = newScore
-          suggestions = newCritiqueResult.suggestions
-        endif
-      endwhile
+			// --- Decide whether to keep the revision ---
+			if newScore < previousScore
+				// Score got worse. Reject the revision and exit by forcing the loop to end.
+				break = true
+				revisionCount = revisionCount - 1
+			else
+				// Revision is an improvement. Accept it and update our state for the next loop.
+				currentDraft = revisedDraft
+				qualityScore = newScore
+				suggestions = newCritiqueResult.suggestions
+			endif
+		endwhile
 
-      // --- Assemble the final result ---
-      @data.finalDraft = currentDraft
-      @data.finalScore = qualityScore
-      @data.revisionsMade = revisionCount
-    `,
+		// --- Assemble the final result ---
+		@data.finalDraft = currentDraft
+		@data.finalScore = qualityScore
+		@data.revisionsMade = revisionCount
+		`,
 });
 
 // 4. Run the Agent

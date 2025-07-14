@@ -3,32 +3,32 @@ import { openai } from '@ai-sdk/openai';
 import { create } from 'cascador-ai';
 import { z } from 'zod';
 
-const baseConfig = create.Config({model: openai('gpt-4o')});
+const baseConfig = create.Config({ model: openai('gpt-4o') });
 
 const draftGenerator = create.TextGenerator({
-    prompt: 'Write a short, engaging blog post about {{ topic }}.',
-}, baseConfig );
+	prompt: 'Write a short, engaging blog post about {{ topic }}.',
+}, baseConfig);
 
 const critiqueGenerator = create.ObjectGenerator({
-    schema: z.object({
-        score: z.number().describe('Quality score from 1-10.'),
-        suggestions: z.array(z.string()).describe('Actionable suggestions for improvement.'),
-    }),
-    prompt: 'Critique this blog post: {{ draft }}',
+	schema: z.object({
+		score: z.number().describe('Quality score from 1-10.'),
+		suggestions: z.array(z.string()).describe('Actionable suggestions for improvement.'),
+	}),
+	prompt: 'Critique this blog post: {{ draft }}',
 }, baseConfig);
 
 const revisionGenerator = create.TextGenerator({
-    prompt: 'Rewrite the following post based on these suggestions:\n\nPOST:\n{{ draft }}\n\nSUGGESTIONS:\n- {{ suggestions | join("\n- ") }}',
+	prompt: 'Rewrite the following post based on these suggestions:\n\nPOST:\n{{ draft }}\n\nSUGGESTIONS:\n- {{ suggestions | join("\n- ") }}',
 }, baseConfig);
 
 // Define the orchestration script for the agent
 const contentAgent = create.ScriptRunner({
-    context: {
-      draftGenerator, critiqueGenerator, revisionGenerator,
-      topic: "the future of AI-powered development",
-      qualityThreshold: 8, maxRevisions: 3, minRevisions: 1
-    },
-    script: `:data
+	context: {
+		draftGenerator, critiqueGenerator, revisionGenerator,
+		topic: "the future of AI-powered development",
+		qualityThreshold: 8, maxRevisions: 3, minRevisions: 1
+	},
+	script: `:data
       var revisionCount = 0
       var currentDraft = draftGenerator({ topic: topic }).text
       var critique = critiqueGenerator({ draft: currentDraft }).object
