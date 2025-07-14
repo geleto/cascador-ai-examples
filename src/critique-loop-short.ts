@@ -43,6 +43,7 @@ const contentAgent = create.ScriptRunner({
       @data = { finalDraft: currentDraft, finalScore: critique.score, revisionCount: revisionCount }`,
 });
 
-// Run the agent
-const result = await contentAgent();
-console.log(JSON.stringify(result, null, 2));
+(async () => {
+	const result = await contentAgent();
+	console.log(JSON.stringify(result, null, 2));
+})().catch(console.error);
