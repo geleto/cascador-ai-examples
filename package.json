@@ -4,7 +4,9 @@
   "description": "Examples of Cascador-ai usage",
   "main": "src/story.ts",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "tsx src/story.ts",
+    "run:critique": "tsx src/critique-loop.ts"
   },
   "author": "Angel Popov",
   "license": "Apache-2.0",
@@ -12,9 +14,10 @@
     "@ai-sdk/anthropic": "^1.2.12",
     "@ai-sdk/openai": "^1.3.23",
     "ai": "^4.3.17",
-    "dotenv": "^16.6.1"
+    "tsx": "^4.20.3"
   },
   "devDependencies": {
+    "dotenv": "^17.0.1",
     "@eslint/js": "^9.31.0",
     "@types/node": "^24.0.13",
     "@typescript-eslint/eslint-plugin": "^8.36.0",
