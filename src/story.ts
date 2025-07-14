@@ -51,4 +51,4 @@ const mainGenerator = create.TemplateRenderer({
 (async () => {
 	const result = await mainGenerator();
 	console.log(result);
-})();
+})().catch(console.error);
