@@ -10,25 +10,25 @@ const baseConfig = create.Config({
 });
 
 // Story generator using Claude 3
-const storylineGen = create.TextGenerator({
+const storylineGen = create.TextGenerator.withTemplate({
 	model: anthropic('claude-3-5-sonnet-20240620'),
 	prompt: 'Expand the following synopsis into a short story: {{ synopsis }}'
 }, baseConfig);
 
 // Critique generator using GPT-4
-const critiqueGen = create.TextGenerator({
+const critiqueGen = create.TextGenerator.withTemplate({
 	model: openai('gpt-4o'),
 	prompt: 'Provide a critical analysis of the following story: {{ story }}'
 }, baseConfig);
 
 // Translation using GPT-4
-const translateGen = create.TextGenerator({
+const translateGen = create.TextGenerator.withTemplate({
 	model: openai('gpt-4o'),
 	prompt: 'Translate the following text to {{ language }}: {{ text }}'
 }, baseConfig);
 
 // Main template renderer for orchestrating the whole process
-const mainGenerator = create.TemplateRenderer({
+const mainGenerator = create.Template({
 	filters: {
 		translate: async (text: string, lang: string) => (await translateGen({ text, language: lang })).text
 	},
@@ -39,7 +39,7 @@ const mainGenerator = create.TemplateRenderer({
 		critiqueGen,
 		language: 'Spanish',
 	},
-	prompt: `
+	template: `
     {% set synopsis = readFile('./src/synopsis.txt') %}
     {% set storyContent = (storylineGen({ synopsis: synopsis })).text %}
 	Story: {{ storyContent }}

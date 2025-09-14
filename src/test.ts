@@ -1,11 +1,8 @@
+import 'dotenv/config';
+
 import { anthropic } from '@ai-sdk/anthropic';
 import { generateText } from 'ai';
 import { create } from 'cascador-ai';
-
-import 'dotenv/config';
-
-console.log(process.env.ANTHROPIC_API_KEY);
-
 
 const { text } = await generateText({
 	model: anthropic('claude-3-7-sonnet-latest'),
@@ -13,8 +10,6 @@ const { text } = await generateText({
 });
 
 console.log(text);
-
-
 
 // 1. Define a reusable base configuration using GPT-4o
 export const baseLLMConfig = create.Config({

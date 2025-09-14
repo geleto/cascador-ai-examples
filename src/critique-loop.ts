@@ -8,19 +8,19 @@ import { z } from 'zod';
 const baseLLMConfig = create.Config({
 	model: openai('gpt-4o'),
 	temperature: 0.7,
-	debug: true,
+	//debug: true,
 });
 
 // 2. Define the Agent's Core Capabilities (Renderers)
 
 // A renderer to write drafts (inherits GPT-4o from baseConfig)
-const draftGenerator = create.TextGenerator({
+const draftGenerator = create.TextGenerator.withTemplate({
 	prompt: 'Write a short, engaging blog post about {{ topic }}.',
 }, baseLLMConfig);
 
 // A renderer to critique drafts using a structured schema.
 // This overrides the base model to use Claude Sonnet for critique.
-const critiqueGenerator = create.ObjectGenerator({
+const critiqueGenerator = create.ObjectGenerator.withTemplate({
 	model: anthropic('claude-3-7-sonnet-latest'),
 	output: 'object',
 	schema: z.object({
@@ -31,14 +31,14 @@ const critiqueGenerator = create.ObjectGenerator({
 }, baseLLMConfig);
 
 // A renderer to rewrite a draft based on feedback (inherits GPT-4o)
-const revisionGenerator = create.TextGenerator({
+const revisionGenerator = create.TextGenerator.withTemplate({
 	prompt: 'Rewrite the following blog post based on the suggestions provided.\n\nORIGINAL POST:\n{{ draft }}\n\nSUGGESTIONS:\n- {{ suggestions | join("\n- ") }}\n\nREVISED POST:',
 }, baseLLMConfig);
 
 
 // 3. Define the Orchestrator Script
-const contentAgent = create.ScriptRunner({
-	debug: true,
+const contentAgent = create.Script({
+	//debug: true,
 	context: {
 		// Provide the renderers to the script
 		draftGenerator,
