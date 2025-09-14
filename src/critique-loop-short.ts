@@ -3,7 +3,7 @@ import { openai } from '@ai-sdk/openai';
 import { create } from 'cascador-ai';
 import { z } from 'zod';
 
-const baseConfig = create.Config({ model: openai('gpt-4o') });
+const baseConfig = create.Config({ model: openai('gpt-4.1-nano') });
 
 const draftGenerator = create.TextGenerator.withTemplate({
 	prompt: 'Write a short, engaging blog post about {{ topic }}.',
@@ -43,7 +43,6 @@ const contentAgent = create.Script({
       @data = { finalDraft: currentDraft, finalScore: critique.score, revisionCount: revisionCount }`,
 });
 
-(async () => {
-	const result = await contentAgent();
-	console.log(JSON.stringify(result, null, 2));
-})().catch(console.error);
+// Run the agent
+const result = await contentAgent();
+console.log(JSON.stringify(result, null, 2));

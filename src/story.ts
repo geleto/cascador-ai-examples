@@ -11,19 +11,19 @@ const baseConfig = create.Config({
 
 // Story generator using Claude 3
 const storylineGen = create.TextGenerator.withTemplate({
-	model: anthropic('claude-3-5-sonnet-20240620'),
+	model: anthropic('claude-3-5-haiku-latest'),
 	prompt: 'Expand the following synopsis into a short story: {{ synopsis }}'
 }, baseConfig);
 
 // Critique generator using GPT-4
 const critiqueGen = create.TextGenerator.withTemplate({
-	model: openai('gpt-4o'),
+	model: openai('gpt-4.1-nano'),
 	prompt: 'Provide a critical analysis of the following story: {{ story }}'
 }, baseConfig);
 
 // Translation using GPT-4
 const translateGen = create.TextGenerator.withTemplate({
-	model: openai('gpt-4o'),
+	model: openai('gpt-4.1-nano'),
 	prompt: 'Translate the following text to {{ language }}: {{ text }}'
 }, baseConfig);
 
@@ -48,7 +48,5 @@ const mainGenerator = create.Template({
 	Story: in {{ storyContent | translate(language) }}`
 });
 
-(async () => {
-	const result = await mainGenerator();
-	console.log(result);
-})().catch(console.error);
+const result = await mainGenerator();
+console.log(result);

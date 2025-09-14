@@ -6,7 +6,7 @@ import { z } from 'zod';
 
 // 1. Define a reusable base configuration using GPT-4o
 const baseLLMConfig = create.Config({
-	model: openai('gpt-4o'),
+	model: openai('gpt-4.1-nano'),
 	temperature: 0.7,
 	//debug: true,
 });
@@ -96,7 +96,5 @@ const contentAgent = create.Script({
 });
 
 // 4. Run the Agent
-(async () => {
-	const result = await contentAgent();
-	console.log(JSON.stringify(result, null, 2));
-})().catch(console.error);
+const result = await contentAgent();
+console.log(JSON.stringify(result, null, 2));

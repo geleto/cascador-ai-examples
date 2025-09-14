@@ -2,6 +2,7 @@
   "name": "cascador-ai-examples",
   "version": "1.0.0",
   "description": "Examples of Cascador-ai usage",
+  "type": "module",
   "main": "src/story.ts",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
