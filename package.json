@@ -15,7 +15,7 @@
     "@ai-sdk/anthropic": "^2.0.16",
     "@ai-sdk/openai": "^2.0.30",
     "ai": "^5.0.44",
-    "cascador-ai": "^0.1.2",
+    "cascador-ai": "^0.2.1",
     "tsx": "^4.20.3"
   },
   "devDependencies": {
