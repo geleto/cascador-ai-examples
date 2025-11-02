@@ -2,7 +2,7 @@ import 'dotenv/config';
 import fs from 'fs/promises';
 import { anthropic } from '@ai-sdk/anthropic';
 import { openai } from '@ai-sdk/openai';
-import { create } from 'cascador-ai';
+import { create } from 'casai';
 
 // Base shared configuration
 const baseConfig = create.Config({

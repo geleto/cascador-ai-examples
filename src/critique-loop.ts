@@ -1,7 +1,7 @@
 import 'dotenv/config';
 import { anthropic } from '@ai-sdk/anthropic';
 import { openai } from '@ai-sdk/openai';
-import { create } from 'cascador-ai';
+import { create } from 'casai';
 import { z } from 'zod';
 
 // 1. Define a reusable base configuration using GPT-4o

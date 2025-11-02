@@ -2,7 +2,7 @@ import 'dotenv/config';
 
 import { anthropic } from '@ai-sdk/anthropic';
 import { generateText } from 'ai';
-import { create } from 'cascador-ai';
+import { create } from 'casai';
 
 const { text } = await generateText({
 	model: anthropic('claude-3-7-sonnet-latest'),

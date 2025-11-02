@@ -1,3 +1,3 @@
-# cascador-examples
+# casai-examples
 
-`npm link cascador-ai`
+`npm link casai`

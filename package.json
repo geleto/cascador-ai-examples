@@ -1,7 +1,7 @@
 {
-  "name": "cascador-ai-examples",
+  "name": "casai-examples",
   "version": "1.0.0",
-  "description": "Examples of Cascador-ai usage",
+  "description": "Examples of Casai usage",
   "type": "module",
   "main": "src/story.ts",
   "scripts": {
@@ -15,7 +15,7 @@
     "@ai-sdk/anthropic": "^2.0.16",
     "@ai-sdk/openai": "^2.0.30",
     "ai": "^5.0.44",
-    "cascador-ai": "^0.2.1",
+    "casai": "^0.3.0",
     "tsx": "^4.20.3"
   },
   "devDependencies": {

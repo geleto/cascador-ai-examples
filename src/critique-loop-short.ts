@@ -1,6 +1,6 @@
 import 'dotenv/config';
 import { openai } from '@ai-sdk/openai';
-import { create } from 'cascador-ai';
+import { create } from 'casai';
 import { z } from 'zod';
 
 const baseConfig = create.Config({ model: openai('gpt-4.1-nano') });
