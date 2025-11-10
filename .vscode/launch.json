@@ -2,11 +2,11 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Debug Critique Loop (Short)",
+      "name": "Run Example 1",
       "type": "node",
       "request": "launch",
-      "runtimeExecutable": "node",
-      "runtimeArgs": ["--import", "tsx", "${workspaceFolder}/src/critique-loop-short.ts"],
+      "program": "${workspaceFolder}/scripts/run-example.mjs",
+      "args": ["1"],
       "cwd": "${workspaceFolder}",
       "console": "integratedTerminal",
       "internalConsoleOptions": "neverOpen",
@@ -16,11 +16,11 @@
       }
     },
     {
-      "name": "Debug Critique Loop (Full)",
+      "name": "Run Example 2",
       "type": "node",
       "request": "launch",
-      "runtimeExecutable": "node",
-      "runtimeArgs": ["--import", "tsx", "${workspaceFolder}/src/critique-loop.ts"],
+      "program": "${workspaceFolder}/scripts/run-example.mjs",
+      "args": ["2"],
       "cwd": "${workspaceFolder}",
       "console": "integratedTerminal",
       "internalConsoleOptions": "neverOpen",
@@ -30,11 +30,11 @@
       }
     },
     {
-      "name": "Debug Story",
+      "name": "Run Example 3",
       "type": "node",
       "request": "launch",
-      "runtimeExecutable": "node",
-      "runtimeArgs": ["--import", "tsx", "${workspaceFolder}/src/story.ts"],
+      "program": "${workspaceFolder}/scripts/run-example.mjs",
+      "args": ["3"],
       "cwd": "${workspaceFolder}",
       "console": "integratedTerminal",
       "internalConsoleOptions": "neverOpen",
