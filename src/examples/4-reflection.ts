@@ -18,7 +18,7 @@
  */
 
 import fs from 'fs/promises';
-import { basicModel, advancedModel } from './setup'
+import { basicModel, advancedModel } from '../setup';
 
 import { create } from 'casai';
 import { z } from 'zod';
@@ -70,7 +70,7 @@ const contentAgent = create.Script({
     `:data
 
     // --- Generate and critique the initial draft ---
-    var currentDraft = draftGenerator({ topic: readTopic('src/4-reflection-topic.txt') }).text
+    var currentDraft = draftGenerator({ topic: readTopic('src/examples/4-reflection-topic.txt') }).text
     var critiqueResult = critiqueGenerator({ draft: currentDraft }).object
     var revisionCount = 0
 

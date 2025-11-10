@@ -16,7 +16,7 @@
  * - Clear separation of concerns
  */
 
-import { basicModel } from './setup'
+import { basicModel } from '../setup';
 import { create } from 'casai';
 
 // 1. Define base configuration

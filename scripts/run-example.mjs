@@ -1,6 +1,6 @@
 import { readdir } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
-import { join, resolve } from 'node:path';
+import { join, resolve, relative } from 'node:path';
 import process from 'node:process';
 import { register } from 'tsx/esm/api';
 
@@ -41,32 +41,52 @@ if (!prefix) {
 
 const basePrefix = `${prefix}-`;
 const srcDir = resolve(process.cwd(), 'src');
+const examplesDir = join(srcDir, 'examples');
 
-const entries = await readdir(srcDir);
-const matches = entries
-  .filter((name) => name.startsWith(basePrefix))
-  .filter((name) => name.endsWith('.ts') || name.endsWith('.tsx'))
-  .filter((name) => !name.endsWith('.d.ts'));
+async function findMatches(dir) {
+  try {
+    const entries = await readdir(dir);
+    return entries
+      .filter((name) => name.startsWith(basePrefix))
+      .filter((name) => name.endsWith('.ts') || name.endsWith('.tsx'))
+      .filter((name) => !name.endsWith('.d.ts'))
+      .map((name) => ({
+        dir,
+        name,
+        displayName: relative(srcDir, join(dir, name)) || name,
+      }));
+  } catch (error) {
+    if (error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT') {
+      return [];
+    }
+    throw error;
+  }
+}
+
+const matches = (
+  await Promise.all([examplesDir, srcDir].map((dir) => findMatches(dir)))
+).flat();
 
 if (matches.length === 0) {
-  console.error(`No example file starting with "${basePrefix}" found in src.`);
+  console.error(`No example file starting with "${basePrefix}" found in src or src/examples.`);
   process.exitCode = 1;
   process.exit();
 }
 
 if (matches.length > 1) {
   console.error(`Found multiple matches for prefix "${basePrefix}". Please be more specific.`);
-  matches.forEach((name) => console.error(` - ${name}`));
+  matches.forEach((match) => console.error(` - ${match.displayName}`));
   process.exitCode = 1;
   process.exit();
 }
 
-const targetFile = join(srcDir, matches[0]);
+const [match] = matches;
+const targetFile = join(match.dir, match.name);
 
 try {
   await import(pathToFileURL(targetFile).href);
 } catch (error) {
-  console.error(`Failed to run example "${matches[0]}".`);
+  console.error(`Failed to run example "${match.displayName}".`);
   console.error(error);
   process.exitCode = 1;
   process.exit();
