@@ -1,3 +1,3 @@
 # casai-examples
 
-`npm link casai`
+`npm run example 4`
