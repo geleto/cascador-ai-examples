@@ -34,7 +34,8 @@ export default tseslint.config(
 			'no-multi-spaces': 'error',
 
 			"@typescript-eslint/no-explicit-any": "off",
-			"@typescript-eslint/no-non-null-assertion": "off"
+			"@typescript-eslint/no-non-null-assertion": "off",
+			"@typescript-eslint/restrict-template-expressions": "off"
 		}
 	}
 );
