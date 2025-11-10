@@ -1,0 +1,1 @@
+Our entire production API has been down for the last 30 minutes. We're getting 500 errors on all endpoints and this is affecting thousands of our users. We need immediate help!
