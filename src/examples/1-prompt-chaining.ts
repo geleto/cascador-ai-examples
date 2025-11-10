@@ -16,8 +16,11 @@
  * - Clear separation of concerns
  */
 
+import fs from 'fs/promises';
 import { basicModel } from '../setup';
 import { create } from 'casai';
+
+const topic = (await fs.readFile('src/examples/1-prompt-chaining-topic.txt', 'utf-8')).trim();
 
 // 1. Define base configuration
 const baseLLMConfig = create.Config({
@@ -54,7 +57,7 @@ const articleAgent = create.Script({
 		outliner,
 		writer,
 		titleGenerator,
-		topic: 'The rise of AI coding assistants',
+		topic,
 	},
 	script: `
 		:data
