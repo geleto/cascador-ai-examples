@@ -7,7 +7,7 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "tsx src/story.ts",
-    "critique": "tsx src/critique-loop.ts"
+    "critique": "tsx src/4-reflection.ts"
   },
   "author": "Angel Popov",
   "license": "Apache-2.0",

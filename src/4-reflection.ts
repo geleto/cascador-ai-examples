@@ -1,27 +1,27 @@
-import 'dotenv/config';
-import { anthropic } from '@ai-sdk/anthropic';
-import { openai } from '@ai-sdk/openai';
+import fs from 'fs/promises';
+import { basicModel, advancedModel } from './setup'
+
 import { create } from 'casai';
 import { z } from 'zod';
 
-// 1. Define a reusable base configuration using GPT-4o
+// 1. Define a reusable base configuration using basicModel
 const baseLLMConfig = create.Config({
-	model: openai('gpt-4.1-nano'),
+	model: basicModel, //e.g. openai('gpt-4.1-nano');
 	temperature: 0.7,
 	//debug: true,
 });
 
 // 2. Define the Agent's Core Capabilities (Renderers)
 
-// A renderer to write drafts (inherits GPT-4o from baseConfig)
+// 2.1. A renderer to write drafts (inherits the model from baseConfig)
 const draftGenerator = create.TextGenerator.withTemplate({
 	prompt: 'Write a short, engaging blog post about {{ topic }}.',
 }, baseLLMConfig);
 
-// A renderer to critique drafts using a structured schema.
-// This overrides the base model to use Claude Sonnet for critique.
+// 2.2. A renderer to critique drafts using a structured schema.
+// This overrides the model to use the advanced model
 const critiqueGenerator = create.ObjectGenerator.withTemplate({
-	model: anthropic('claude-3-7-sonnet-latest'),
+	model: advancedModel, // e.g. anthropic('claude-3-7-sonnet-latest')
 	output: 'object',
 	schema: z.object({
 		score: z.number().describe('Quality score from 1-10 on clarity and engagement.'),
@@ -35,17 +35,16 @@ const revisionGenerator = create.TextGenerator.withTemplate({
 	prompt: 'Rewrite the following blog post based on the suggestions provided.\n\nORIGINAL POST:\n{{ draft }}\n\nSUGGESTIONS:\n- {{ suggestions | join("\n- ") }}\n\nREVISED POST:',
 }, baseLLMConfig);
 
-
 // 3. Define the Orchestrator Script
 const contentAgent = create.Script({
-	//debug: true,
 	context: {
 		// Provide the renderers to the script
 		draftGenerator,
 		critiqueGenerator,
 		revisionGenerator,
 		// Define workflow parameters
-		topic: 'the future of AI-powered development',
+		topic: 'The future of AI-powered development',
+		readTopic: async (filePath: string) => await fs.readFile(filePath, 'utf-8'),
 		qualityThreshold: 8,
 		minRevisions: 1,
 		maxRevisions: 3,
@@ -55,7 +54,7 @@ const contentAgent = create.Script({
 		:data
 
 		// --- Generate and critique the initial draft ---
-		var currentDraft = draftGenerator({ topic: topic }).text
+		var currentDraft = draftGenerator({ topic: readTopic('src/4-reflection-topic.txt') }).text
 		var critiqueResult = critiqueGenerator({ draft: currentDraft }).object
 		var qualityScore = critiqueResult.score
 		var suggestions = critiqueResult.suggestions
@@ -91,8 +90,7 @@ const contentAgent = create.Script({
 		// --- Assemble the final result ---
 		@data.finalDraft = currentDraft
 		@data.finalScore = qualityScore
-		@data.revisionsMade = revisionCount
-		`,
+		@data.revisionsMade = revisionCount`
 });
 
 // 4. Run the Agent
