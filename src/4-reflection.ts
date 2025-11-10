@@ -1,3 +1,22 @@
+/**
+ * REFLECTION PATTERN EXAMPLE
+ *
+ * Demonstrates an AI agent that improves its own output through self-critique.
+ *
+ * HOW IT WORKS:
+ * 1. Generate an initial draft
+ * 2. Critique the draft (get score + suggestions)
+ * 3. If score < threshold: revise based on suggestions
+ * 4. Critique again - only keep revision if it improves the score
+ * 5. Repeat until quality threshold met or max revisions reached
+ *
+ * KEY CONCEPTS:
+ * - Self-improvement loop with structured feedback
+ * - Multiple AI calls orchestrated in sequence
+ * - Conditional logic to accept/reject revisions
+ * - Using advanced model for critique, basic model for generation
+ */
+
 import fs from 'fs/promises';
 import { basicModel, advancedModel } from './setup'
 
@@ -43,54 +62,42 @@ const contentAgent = create.Script({
 		critiqueGenerator,
 		revisionGenerator,
 		// Define workflow parameters
-		topic: 'The future of AI-powered development',
 		readTopic: async (filePath: string) => await fs.readFile(filePath, 'utf-8'),
 		qualityThreshold: 8,
-		minRevisions: 1,
 		maxRevisions: 3,
 	},
-	script:
-		`// This script orchestrates the agent's "thought process".
-		:data
+	script: // This script orchestrates the agent's "thought process".
+    `:data
 
-		// --- Generate and critique the initial draft ---
-		var currentDraft = draftGenerator({ topic: readTopic('src/4-reflection-topic.txt') }).text
-		var critiqueResult = critiqueGenerator({ draft: currentDraft }).object
-		var qualityScore = critiqueResult.score
-		var suggestions = critiqueResult.suggestions
-		var revisionCount = 0
-		var break = false
+    // --- Generate and critique the initial draft ---
+    var currentDraft = draftGenerator({ topic: readTopic('src/4-reflection-topic.txt') }).text
+    var critiqueResult = critiqueGenerator({ draft: currentDraft }).object
+    var revisionCount = 0
 
-		// --- Start the revision loop ---
-		while (qualityScore < qualityThreshold or revisionCount < minRevisions) and revisionCount < maxRevisions and not break
-			var previousDraft = currentDraft
-			var previousScore = qualityScore
-			revisionCount = revisionCount + 1
+    // --- Revision loop: keep improving until we hit quality threshold or max revisions ---
+    while critiqueResult.score < qualityThreshold and revisionCount < maxRevisions
+        revisionCount = revisionCount + 1
 
-			// Revise the draft based on the latest suggestions
-			var revisedDraft = revisionGenerator({ draft: currentDraft, suggestions: suggestions }).text
+        // Revise the draft based on current critique
+        var revisedDraft = revisionGenerator({
+            draft: currentDraft,
+            suggestions: critiqueResult.suggestions
+        }).text
 
-			// --- Critique the NEW revised draft ---
-			var newCritiqueResult = critiqueGenerator({ draft: revisedDraft }).object
-			var newScore = newCritiqueResult.score
+        // Critique the revised draft
+        var newCritique = critiqueGenerator({ draft: revisedDraft }).object
 
-			// --- Decide whether to keep the revision ---
-			if newScore < previousScore
-				// Score got worse. Reject the revision and exit by forcing the loop to end.
-				break = true
-				revisionCount = revisionCount - 1
-			else
-				// Revision is an improvement. Accept it and update our state for the next loop.
-				currentDraft = revisedDraft
-				qualityScore = newScore
-				suggestions = newCritiqueResult.suggestions
-			endif
-		endwhile
+        // Only accept the revision if it's an improvement
+        if newCritique.score >= critiqueResult.score
+            currentDraft = revisedDraft
+            critiqueResult = newCritique
+        endif
+    endwhile
 
-		// --- Assemble the final result ---
-		@data.finalDraft = currentDraft
-		@data.finalScore = qualityScore
-		@data.revisionsMade = revisionCount`
+    // --- Assemble the final result ---
+    @data.finalDraft = currentDraft
+    @data.finalScore = critiqueResult.score
+    @data.revisionsMade = revisionCount`
 });
 
 // 4. Run the Agent
