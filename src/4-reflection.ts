@@ -43,8 +43,8 @@ const critiqueGenerator = create.ObjectGenerator.withTemplate({
 	model: advancedModel, // e.g. anthropic('claude-3-7-sonnet-latest')
 	output: 'object',
 	schema: z.object({
-		score: z.number().describe('Quality score from 1-10 on clarity and engagement.'),
-		suggestions: z.array(z.string()).describe('Specific, actionable suggestions for improvement.'),
+		score: z.number().int().min(1).max(10).describe('Quality score from 1-10 on clarity and engagement.'),
+		suggestions: z.array(z.string()).min(1).describe('List of specific, actionable suggestions for improvement.'),
 	}),
 	prompt: 'Critique this blog post. Provide a quality score and concrete suggestions for improvement.\n\nPOST:\n{{ draft }}',
 }, baseLLMConfig);
