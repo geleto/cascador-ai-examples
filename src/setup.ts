@@ -1,8 +1,16 @@
-
 import 'dotenv/config';
 
 import { openai } from '@ai-sdk/openai';
 import { anthropic } from '@ai-sdk/anthropic';
+import { withProgressIndicator } from './model-progress';
 
-export const basicModel = openai('gpt-4.1-nano');
-export const advancedModel = anthropic('claude-3-7-sonnet-latest');
+// Export wrapped models with progress indicators
+export const basicModel = withProgressIndicator(
+	openai('gpt-4.1-nano'),
+	'GPT-4o-nano'
+);
+
+export const advancedModel = withProgressIndicator(
+	anthropic('claude-3-7-sonnet-latest'),
+	'Claude-3.7-Sonnet'
+);
