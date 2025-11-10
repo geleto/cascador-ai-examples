@@ -20,8 +20,6 @@ import fs from 'fs/promises';
 import { basicModel } from '../setup';
 import { create } from 'casai';
 
-const topic = (await fs.readFile('src/examples/1-prompt-chaining-topic.txt', 'utf-8')).trim();
-
 // 1. Define base configuration
 const baseLLMConfig = create.Config({
 	model: basicModel,
@@ -57,12 +55,13 @@ const articleAgent = create.Script({
 		outliner,
 		writer,
 		titleGenerator,
-		topic,
+		readTopic: async () => (await fs.readFile('src/examples/1-prompt-chaining-topic.txt', 'utf-8')).trim(),
 	},
 	script: `
 		:data
 
 		// Step 1: Research the topic
+		var topic = readTopic()
 		var facts = researcher({ topic: topic }).text
 
 		// Step 2: Create an outline from the facts
