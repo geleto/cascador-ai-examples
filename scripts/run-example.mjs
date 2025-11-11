@@ -1,4 +1,4 @@
-import { readdir } from 'node:fs/promises';
+import { access, readdir } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import { join, resolve, relative } from 'node:path';
 import process from 'node:process';
@@ -41,20 +41,35 @@ if (!prefix) {
 
 const basePrefix = `${prefix}-`;
 const srcDir = resolve(process.cwd(), 'src');
-const examplesDir = join(srcDir, 'examples');
-
 async function findMatches(dir) {
   try {
-    const entries = await readdir(dir);
-    return entries
-      .filter((name) => name.startsWith(basePrefix))
-      .filter((name) => name.endsWith('.ts') || name.endsWith('.tsx'))
-      .filter((name) => !name.endsWith('.d.ts'))
-      .map((name) => ({
-        dir,
-        name,
-        displayName: relative(srcDir, join(dir, name)) || name,
-      }));
+    const entries = await readdir(dir, { withFileTypes: true });
+    const matches = [];
+
+    for (const entry of entries) {
+      if (!entry.isDirectory()) {
+        continue;
+      }
+      if (!entry.name.startsWith(basePrefix)) {
+        continue;
+      }
+
+      const directory = join(dir, entry.name);
+      const indexFile = join(directory, 'index.ts');
+
+      try {
+        await access(indexFile);
+        matches.push({
+          dir: directory,
+          name: 'index.ts',
+          displayName: relative(srcDir, indexFile) || indexFile,
+        });
+      } catch {
+        // Ignore directories without an index.ts file
+      }
+    }
+
+    return matches;
   } catch (error) {
     if (error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT') {
       return [];
@@ -63,12 +78,10 @@ async function findMatches(dir) {
   }
 }
 
-const matches = (
-  await Promise.all([examplesDir, srcDir].map((dir) => findMatches(dir)))
-).flat();
+const matches = (await Promise.all([srcDir].map((dir) => findMatches(dir)))).flat();
 
 if (matches.length === 0) {
-  console.error(`No example file starting with "${basePrefix}" found in src or src/examples.`);
+  console.error(`No example folder starting with "${basePrefix}" found in src.`);
   process.exitCode = 1;
   process.exit();
 }

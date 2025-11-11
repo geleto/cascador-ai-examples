@@ -23,6 +23,8 @@ import { basicModel, advancedModel } from '../setup';
 import { create } from 'casai';
 import { z } from 'zod';
 
+const inputFile = new URL('./input.txt', import.meta.url);
+
 // 1. Define a reusable base configuration using basicModel
 const baseLLMConfig = create.Config({
 	model: basicModel, //e.g. openai('gpt-4.1-nano');
@@ -62,7 +64,7 @@ const contentAgent = create.Script({
 		critiqueGenerator,
 		revisionGenerator,
 		// Define workflow parameters
-		readTopic: async (filePath: string) => await fs.readFile(filePath, 'utf-8'),
+		readTopic: async () => await fs.readFile(inputFile, 'utf-8'),
 		qualityThreshold: 8,
 		maxRevisions: 3,
 	},
@@ -70,7 +72,7 @@ const contentAgent = create.Script({
     `:data
 
     // --- Generate and critique the initial draft ---
-    var currentDraft = draftGenerator({ topic: readTopic('src/examples/4-reflection-topic.txt') }).text
+    var currentDraft = draftGenerator({ topic: readTopic() }).text
     var critiqueResult = critiqueGenerator({ draft: currentDraft }).object
     var revisionCount = 0
 

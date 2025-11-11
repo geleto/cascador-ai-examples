@@ -21,6 +21,8 @@ import fs from 'fs/promises';
 import { basicModel, advancedModel } from '../setup';
 import { create } from 'casai';
 
+const inputFile = new URL('./input.txt', import.meta.url);
+
 // 1. Define configurations for different handler types
 const quickResponseConfig = create.Config({
 	model: basicModel,
@@ -73,7 +75,7 @@ const supportAgent = create.Script({
 			urgent: urgentHandler,
 		},
 		readInquiry: async () => {
-			const inquiry = await fs.readFile('src/examples/3-routing-inquiry.txt', 'utf-8')
+			const inquiry = await fs.readFile(inputFile, 'utf-8')
 			return inquiry.trim()
 		}
 	},
