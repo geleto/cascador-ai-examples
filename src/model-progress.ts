@@ -14,11 +14,14 @@ function logCompletion(
 	callId: number,
 	startTime: number,
 	usage: LanguageModelV2Usage | undefined,
-	mode: 'generating' | 'streaming'
+	mode: 'generating' | 'streaming',
+	activeCalls: number
 ) {
 	const duration = ((Date.now() - startTime) / 1000).toFixed(2);
 	const outputTokens = usage?.outputTokens ?? usage?.totalTokens ?? 0;
-	process.stdout.write(`[${modelName} #${callId}] ✅ Complete ${mode}: ${String(outputTokens)} tokens in ${duration}s\n`);
+	process.stdout.write(
+		`[${modelName} #${callId}] ✅ Complete ${mode}: ${String(outputTokens)} tokens in ${duration}s | active: ${activeCalls}\n`
+	);
 }
 
 interface PromptPreview {
@@ -119,6 +122,7 @@ function formatPromptSuffix(preview: PromptPreview | undefined) {
 // Progress indicator wrapper
 export function withProgressIndicator(model: LanguageModelV2, modelName: string) {
 	let callCounter = 0;
+	let activeCalls = 0;
 
 	return wrapLanguageModel({
 		model,
@@ -128,12 +132,21 @@ export function withProgressIndicator(model: LanguageModelV2, modelName: string)
 				const startTime = Date.now();
 				const promptSuffix = formatPromptSuffix(getPromptPreview(params));
 
-				process.stdout.write(`[${modelName} #${callId}] 🚩 Start generating${promptSuffix}\n`);
+				activeCalls++;
+				process.stdout.write(
+					`[${modelName} #${callId}] 🚩 Start generating${promptSuffix} | active: ${activeCalls}\n`
+				);
 
-				const result = await doGenerate();
-				logCompletion(modelName, callId, startTime, result.usage, 'generating');
+				try {
+					const result = await doGenerate();
+					activeCalls--;
+					logCompletion(modelName, callId, startTime, result.usage, 'generating', activeCalls);
 
-				return result;
+					return result;
+				} catch (error) {
+					activeCalls--;
+					throw error;
+				}
 			},
 
 			wrapStream: async ({ doStream, params }) => {
@@ -141,16 +154,28 @@ export function withProgressIndicator(model: LanguageModelV2, modelName: string)
 				const startTime = Date.now();
 				const promptSuffix = formatPromptSuffix(getPromptPreview(params));
 
-				process.stdout.write(`[${modelName} #${callId}] 🚩 Start streaming${promptSuffix}\n`);
+				activeCalls++;
+				process.stdout.write(
+					`[${modelName} #${callId}] 🚩 Start streaming${promptSuffix} | active: ${activeCalls}\n`
+				);
 
-				const { stream: originalStream, ...rest } = await doStream();
+				let streamResult;
+				try {
+					streamResult = await doStream();
+				} catch (error) {
+					activeCalls--;
+					throw error;
+				}
+
+				const { stream: originalStream, ...rest } = streamResult;
 
 				const transformStream = new TransformStream<LanguageModelV2StreamPart, LanguageModelV2StreamPart>({
 					transform(chunk: LanguageModelV2StreamPart, controller) {
 						controller.enqueue(chunk);
 
 						if (chunk.type === 'finish') {
-							logCompletion(modelName, callId, startTime, chunk.usage, 'streaming');
+							activeCalls--;
+							logCompletion(modelName, callId, startTime, chunk.usage, 'streaming', activeCalls);
 						}
 					}
 				});
