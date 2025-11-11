@@ -1,0 +1,27 @@
+================================================================================
+STOCK ANALYSIS RESULTS
+================================================================================
+
+Markets Analyzed: {{ markets | join(", ") }}
+Stocks Processed: {{ total }} total, {{ analyzed }} analyzed, {{ skipped }} skipped
+
+TOP {{ topStocks.length }} STOCKS:
+--------------------------------------------------------------------------------
+
+{% for stock in topStocks %}
+{{ stock.rank }}. [{{ stock.ticker }}] {{ stock.companyName }} - {{ stock.market }}
+   Score: {{ stock.finalScore | round(1) }}/10
+   
+   Analysis:
+{{ stock.analysis | indent(3) }}
+
+   Component Scores:
+   • Criteria Fit: {{ stock.criteriaAlignment }}/10
+   • Financial Health: {{ stock.financialStrength }}/10
+   • Growth Potential: {{ stock.growthPotential }}/10
+   • Market Position: {{ stock.marketPosition }}/10
+   • Contrarian: {{ stock.contrarianScore }}/10
+   • Risk Level: {{ stock.riskLevel }}/10
+
+{% endfor %}
+================================================================================

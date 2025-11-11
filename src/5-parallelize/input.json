@@ -1,0 +1,14 @@
+{
+	"marketContext": "Affected positively by war with China and Taiwan",
+
+	"preferCriteria": "Positive current outlook in the next 5 years",
+
+	"avoidCriteria": "Can be negatively disrupted by Chinese competition in the next 5 years",
+
+	"numMarkets": 3,
+	"numAdditionalMarkets": 2,
+	"numStocksPerMarket": 5,
+
+	"numTopStocks": 10,
+	"numMaxStocksPerMarket": 4
+  }

@@ -1,0 +1,4 @@
+INVESTMENT CONTEXT:
+Market Context: {{ marketContext }}
+What We Prefer: {{ preferCriteria }}
+What We Avoid: {{ avoidCriteria }}
