@@ -120,7 +120,15 @@ function formatPromptSuffix(preview: PromptPreview | undefined) {
 }
 
 // Progress indicator wrapper
-export function withProgressIndicator(model: LanguageModelV2, modelName: string) {
+export function withProgressIndicator(
+	model: LanguageModelV2,
+	modelName: string,
+	showProgress = true
+) {
+	if (!showProgress) {
+		return model;
+	}
+
 	let callCounter = 0;
 	let activeCalls = 0;
 
