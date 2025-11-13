@@ -14,7 +14,7 @@ export const basicModel = withProgressIndicator(
 );
 
 export const advancedModel = withProgressIndicator(
-	anthropic('claude-3-7-sonnet-latest'),
-	'Claude-3.7-Sonnet',
+	anthropic('claude-haiku-4-5'),
+	'Claude-4.5-Haiku',
 	showProgressIndicators
 );
