@@ -7,6 +7,40 @@ import {
 } from '@ai-sdk/provider';
 
 const PREVIEW_LIMIT = 40;
+const TOOL_RESULT_PREVIEW_LIMIT = 100;
+
+// Helper function to extract and format tool arguments
+function getToolArguments(part: { type: string; [key: string]: unknown }): string {
+	try {
+		// Check for both 'args' and 'input' properties
+		const args = 'args' in part
+			? part.args
+			: ('input' in part ? (part as unknown as { input: unknown }).input : undefined);
+
+		if (!args) {
+			return '';
+		}
+
+		// If args is already a string, use it directly; otherwise stringify
+		return typeof args === 'string' ? args : JSON.stringify(args);
+	} catch {
+		return '[stringify error]';
+	}
+}
+
+// Helper function to format tool results
+function formatToolResult(result: unknown): string {
+	try {
+		const resultStr = typeof result === 'string'
+			? result
+			: JSON.stringify(result);
+		return resultStr.length > TOOL_RESULT_PREVIEW_LIMIT
+			? resultStr.substring(0, TOOL_RESULT_PREVIEW_LIMIT) + '...'
+			: resultStr;
+	} catch {
+		return '[stringify error]';
+	}
+}
 
 // Helper function for completion logging
 function logCompletion(
@@ -16,10 +50,18 @@ function logCompletion(
 	usage: LanguageModelV2Usage | undefined,
 	mode: 'generating' | 'streaming',
 	activeCalls: number,
-	text: string | undefined
+	text: string | undefined,
+	finishReason?: string
 ) {
 	const duration = ((Date.now() - startTime) / 1000).toFixed(2);
-	const outputTokens = usage?.outputTokens ?? usage?.totalTokens ?? 0;
+
+	// Show input/output tokens for better visibility
+	const inputTokens = usage?.inputTokens ?? 0;
+	const outputTokens = usage?.outputTokens ?? 0;
+
+	const tokenInfo = inputTokens > 0
+		? `${inputTokens}→${outputTokens} tokens`
+		: `${outputTokens} tokens`;
 
 	let resultSuffix = '';
 	if (text) {
@@ -29,10 +71,10 @@ function logCompletion(
 		resultSuffix = ` | result: "${truncated.replace(/"/g, '\\"')}"`;
 	}
 
+	const finishInfo = finishReason ? ` | reason: ${finishReason}` : '';
+
 	process.stdout.write(
-		`[${modelName} #${callId}] ✅ Complete ${mode}: ${String(
-			outputTokens
-		)} tokens in ${duration}s | active: ${activeCalls}${resultSuffix}\n`
+		`[${modelName} #${callId}] ✅ Complete ${mode}: ${tokenInfo} in ${duration}s | active: ${activeCalls}${finishInfo}${resultSuffix}\n`
 	);
 }
 
@@ -176,43 +218,19 @@ export function withProgressIndicator(
 								toolCallMap.set(toolCallId, part.toolName);
 							}
 
-							// Log tool call with arguments
-							try {
-								// Check for both 'args' and 'input' properties
-								const args = 'args' in part
-									? part.args
-									: ('input' in part ? (part as { input: unknown }).input : undefined);
-								// If args is already a string, use it directly; otherwise stringify
-								const argsStr = args
-									? (typeof args === 'string' ? args : JSON.stringify(args))
-									: '';
-								process.stdout.write(
-									`[${modelName} #${callId}] 🔧 ${part.toolName}(${argsStr})\n`
-								);
-							} catch {
-								process.stdout.write(
-									`[${modelName} #${callId}] 🔧 ${part.toolName}([stringify error])\n`
-								);
-							}
+							// Log tool call with arguments using helper
+							const argsStr = getToolArguments(part);
+							process.stdout.write(
+								`[${modelName} #${callId}] 🔧 ${part.toolName}(${argsStr})\n`
+							);
 						} else if (part.type === 'tool-result') {
 							const toolName = part.toolCallId ? toolCallMap.get(part.toolCallId) ?? 'unknown' : 'unknown';
 
-							// Log tool result
-							try {
-								const resultStr = typeof part.result === 'string'
-									? part.result
-									: JSON.stringify(part.result);
-								const preview = resultStr.length > 100
-									? resultStr.substring(0, 100) + '...'
-									: resultStr;
-								process.stdout.write(
-									`[${modelName} #${callId}] ✅ ${toolName} → ${preview}\n`
-								);
-							} catch {
-								process.stdout.write(
-									`[${modelName} #${callId}] ✅ ${toolName} → [stringify error]\n`
-								);
-							}
+							// Log tool result with different emoji
+							const resultStr = formatToolResult(part.result);
+							process.stdout.write(
+								`[${modelName} #${callId}] 📥 ${toolName} → ${resultStr}\n`
+							);
 						}
 					});
 
@@ -256,19 +274,35 @@ export function withProgressIndicator(
 				const { stream: originalStream, ...rest } = streamResult;
 
 				let fullText = '';
-				const toolNames = new Set<string>();
+				let reasoningText = '';
 				const toolInputs = new Map<string, string>();
 				const toolCallIds = new Map<string, string>();
 				const loggedToolCalls = new Set<string>();
+				let streamFinished = false;
+				let finishReason: string | undefined;
 
 				const transformStream = new TransformStream<LanguageModelV2StreamPart, LanguageModelV2StreamPart>({
 					transform(chunk: LanguageModelV2StreamPart, controller) {
 						try {
 							if (chunk.type === 'text-delta') {
 								fullText += chunk.delta;
+							} else if (chunk.type === 'reasoning-start') {
+								// Log reasoning start for o1 models
+								process.stdout.write(
+									`[${modelName} #${callId}] 🧠 Reasoning...\n`
+								);
+							} else if (chunk.type === 'reasoning-delta') {
+								reasoningText += chunk.delta;
+							} else if (chunk.type === 'reasoning-end') {
+								// Show brief reasoning summary
+								const preview = reasoningText.trim().replace(/\s+/g, ' ');
+								const truncated = preview.length > PREVIEW_LIMIT
+									? `${preview.slice(0, PREVIEW_LIMIT)}...`
+									: preview;
+								process.stdout.write(
+									`[${modelName} #${callId}] 🧠 Reasoning complete: "${truncated}"\n`
+								);
 							} else if (chunk.type === 'tool-call') {
-								toolNames.add(chunk.toolName);
-
 								// Store tool call ID for matching with results
 								const toolCallId = chunk.toolCallId;
 								if (toolCallId) {
@@ -279,27 +313,13 @@ export function withProgressIndicator(
 								if (!loggedToolCalls.has(callKey)) {
 									loggedToolCalls.add(callKey);
 
-									// Log tool call with arguments
-									try {
-										// Check for both 'args' and 'input' properties
-										const args = 'args' in chunk
-											? chunk.args
-											: ('input' in chunk ? (chunk as { input: unknown }).input : undefined);
-										// If args is already a string, use it directly; otherwise stringify
-										const argsStr = args
-											? (typeof args === 'string' ? args : JSON.stringify(args))
-											: '';
-										process.stdout.write(
-											`[${modelName} #${callId}] 🔧 ${chunk.toolName}(${argsStr})\n`
-										);
-									} catch {
-										process.stdout.write(
-											`[${modelName} #${callId}] 🔧 ${chunk.toolName}([stringify error])\n`
-										);
-									}
+									// Log tool call with arguments using helper
+									const argsStr = getToolArguments(chunk);
+									process.stdout.write(
+										`[${modelName} #${callId}] 🔧 ${chunk.toolName}(${argsStr})\n`
+									);
 								}
 							} else if (chunk.type === 'tool-input-start') {
-								toolNames.add(chunk.toolName);
 								toolCallIds.set(chunk.id, chunk.toolName);
 								toolInputs.set(chunk.id, '');
 							} else if (chunk.type === 'tool-input-delta') {
@@ -312,15 +332,9 @@ export function withProgressIndicator(
 									if (!loggedToolCalls.has(callKey)) {
 										loggedToolCalls.add(callKey);
 										const input = toolInputs.get(chunk.id);
-										if (input) {
-											process.stdout.write(
-												`[${modelName} #${callId}] 🔧 ${toolName}(${input})\n`
-											);
-										} else {
-											process.stdout.write(
-												`[${modelName} #${callId}] 🔧 ${toolName}()\n`
-											);
-										}
+										process.stdout.write(
+											`[${modelName} #${callId}] 🔧 ${toolName}(${input ?? ''})\n`
+										);
 									}
 									// Clean up input but keep toolCallIds for matching results
 									toolInputs.delete(chunk.id);
@@ -328,30 +342,33 @@ export function withProgressIndicator(
 							} else if (chunk.type === 'tool-result') {
 								const toolName = toolCallIds.get(chunk.toolCallId) ?? 'unknown';
 
-								// Log tool result
-								try {
-									const resultStr = typeof chunk.result === 'string'
-										? chunk.result
-										: JSON.stringify(chunk.result);
-									const preview = resultStr.length > 100
-										? resultStr.substring(0, 100) + '...'
-										: resultStr;
-									process.stdout.write(
-										`[${modelName} #${callId}] ✅ ${toolName} → ${preview}\n`
-									);
-								} catch {
-									process.stdout.write(
-										`[${modelName} #${callId}] ✅ ${toolName} → [stringify error]\n`
-									);
-								}
+								// Log tool result with different emoji
+								const resultStr = formatToolResult(chunk.result);
+								process.stdout.write(
+									`[${modelName} #${callId}] 📥 ${toolName} → ${resultStr}\n`
+								);
+							} else if (chunk.type === 'error') {
+								// Log errors from the model
+								const errorMsg = 'error' in chunk ? String(chunk.error) : 'unknown error';
+								process.stdout.write(
+									`[${modelName} #${callId}] ❌ Model error: ${errorMsg}\n`
+								);
 							}
 
 							controller.enqueue(chunk);
 
 							if (chunk.type === 'finish') {
-								activeCalls--;
+								streamFinished = true;
+								finishReason = chunk.finishReason;
 
-								const toolLog = Array.from(toolNames)
+								// Build tool list from loggedToolCalls
+								const uniqueTools = new Set<string>();
+								loggedToolCalls.forEach(key => {
+									const toolName = key.split('-')[0];
+									uniqueTools.add(toolName);
+								});
+
+								const toolLog = Array.from(uniqueTools)
 									.map(name => `tool:${name}`)
 									.join(', ');
 
@@ -362,7 +379,16 @@ export function withProgressIndicator(
 									logText = toolLog;
 								}
 
-								logCompletion(modelName, callId, startTime, chunk.usage, 'streaming', activeCalls, logText);
+								logCompletion(
+									modelName,
+									callId,
+									startTime,
+									chunk.usage,
+									'streaming',
+									activeCalls - 1, // Show correct count after decrement
+									logText,
+									finishReason
+								);
 
 								// Cleanup maps
 								toolInputs.clear();
@@ -371,16 +397,28 @@ export function withProgressIndicator(
 							}
 						} catch (error) {
 							// Log unexpected errors during chunk processing
+							const errorMsg = error instanceof Error ? error.message : 'unknown';
 							process.stdout.write(
-								`[${modelName} #${callId}] ⚠️  Error processing chunk: ${error instanceof Error ? error.message : 'unknown'}\n`
+								`[${modelName} #${callId}] ⚠️  Error processing chunk (${chunk.type}): ${errorMsg}\n`
 							);
-							// Still enqueue the chunk to avoid breaking the stream
-							controller.enqueue(chunk);
+							// Re-throw to ensure stream error handling works
+							throw error;
 						}
 					},
 
 					flush() {
-						// Cleanup on stream end if not finished normally
+						// Ensure activeCalls is decremented if stream ends without finish
+						if (!streamFinished) {
+							activeCalls--;
+							process.stdout.write(
+								`[${modelName} #${callId}] ⚠️  Stream ended without finish chunk | active: ${activeCalls}\n`
+							);
+						} else {
+							// Normal finish already decremented
+							activeCalls--;
+						}
+
+						// Cleanup on stream end
 						toolInputs.clear();
 						toolCallIds.clear();
 						loggedToolCalls.clear();
