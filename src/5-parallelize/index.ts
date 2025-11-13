@@ -213,6 +213,16 @@ const stockAnalysisAgent = create.Script({
 		fetchYahooFinance,
 		calculateFinalScore,
 		rankAndFilter,
+		/**
+		 * Logs a message to the console.
+		 * @param object
+		 */
+		log(...objects: any[]) {
+			console.log(
+				'--- LOG ---',
+				objects.map(object => JSON.stringify(object, null, 2)).join(' ')
+			);
+		},
 	},
 	script: `
 		:data
@@ -225,34 +235,48 @@ const stockAnalysisAgent = create.Script({
 			marketContext: config.marketContext,
 			numMarkets: config.numMarkets,
 			numAdditionalMarkets: config.numAdditionalMarkets
-		}).array
+		}).object
 
 		// STEP 2: Find stocks (parallel per market via for loop)
 		var allStocks = capture :data
-		for market in markets
-			var result = stockFinder({
-				marketName: market,
-				investmentContext: investmentContext,
-				numStocksPerMarket: config.numStocksPerMarket
-			}).object.stocks
+			@data = [] // will not be needed in the future
+			for market in markets
+				var result = stockFinder({
+					marketName: market,
+					investmentContext: investmentContext,
+					numStocksPerMarket: config.numStocksPerMarket
+				}).object.stocks
+				if result is error
+					result = []
+				endif
+				log('Result:', result)
 
-			for stock in result
-				@data.push({
-					companyName: stock.companyName,
-					ticker: stock.ticker,
-					market: market
-				})
+				for stock in result
+					if stock is error
+						var z = log('Stock is error:')
+					else
+						var z = log('Stock:', stock, 'market:', market)
+						var ss = {
+							companyName: stock.companyName,
+							ticker: stock.ticker,
+							market: market
+						}
+						if ss is error
+							var x = log('SS is error:')
+						else
+							var x = log('SS:', ss)
+							@data.push(ss)
+						endif
+					endif
+				endfor
 			endfor
-		endfor
 		endcapture
 
-		// repair if the capture was poisoned
-		if allStocks is error
-			allStocks = []
-		endif
+		var w = log('All stocks:', allStocks)
 
 		// STEP 3: Analyze stocks (parallel via for loop)
 		var analyses = capture :data
+			@data = [] // will not be needed in the future
 			for stock in allStocks
 				// this will be 'error' if fetchYahooFinance threw in JS
 				var yahooData = fetchYahooFinance(stock.ticker)
@@ -299,11 +323,6 @@ const stockAnalysisAgent = create.Script({
 			endfor
 		endcapture
 
-		// repair analyses too, to avoid "analyses is not iterable"
-		if analyses is error
-			analyses = []
-		endif
-
 		// STEP 4: Rank and filter in JS
 		var topStocks = rankAndFilter(analyses, config)
 
@@ -318,7 +337,6 @@ const stockAnalysisAgent = create.Script({
 
 // 7. Run the agent
 console.log('Starting stock analysis agent...\n');
-console.log('Watch Cascada automatically parallelize the for loops!\n');
 
 const result = await stockAnalysisAgent();
 

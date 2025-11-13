@@ -5,10 +5,10 @@
 
 	"avoidCriteria": "Can be negatively disrupted by Chinese competition in the next 5 years",
 
-	"numMarkets": 3,
+	"numMarkets": 2,
 	"numAdditionalMarkets": 2,
-	"numStocksPerMarket": 5,
+	"numStocksPerMarket": 3,
 
-	"numTopStocks": 10,
-	"numMaxStocksPerMarket": 4
+	"numTopStocks": 3,
+	"numMaxStocksPerMarket": 2
   }
