@@ -6,6 +6,24 @@ import {
 	LanguageModelV2Usage
 } from '@ai-sdk/provider';
 
+/**
+ * Model Logging Utility (Optional)
+ *
+ * This module provides optional logging functionality for language models. It wraps
+ * any LanguageModelV2 instance using the AI SDK's `wrapLanguageModel` middleware
+ * to intercept and log model calls without modifying the underlying model behavior.
+ *
+ * Key Features:
+ * - Logs generation and streaming calls with timing, token usage, and active call counts
+ * - Displays prompt previews, tool calls with arguments, and tool results
+ * - Tracks reasoning steps for models that support it (e.g., o1 models)
+ * - Completely optional - can be disabled by passing `showProgress: false`
+ *
+ * Usage - see setup.ts
+ * The wrapper intercepts calls at the middleware level, logging all interactions
+ * while preserving the original model's behavior and return values.
+ */
+
 const PREVIEW_LIMIT = 40;
 const TOOL_RESULT_PREVIEW_LIMIT = 100;
 
