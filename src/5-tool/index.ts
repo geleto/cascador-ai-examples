@@ -9,23 +9,31 @@ import { create } from 'casai';
 import { basicModel, advancedModel } from '../setup';
 import { z } from 'zod';
 import { readFileSync } from 'fs';
-import { join } from 'path';
+import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
 import { stepCountIs } from 'ai';
 
 // Tool 1: LLM-powered time interpreter
 const timeInterpreterTool = create.ObjectGenerator.withTemplate.asTool({
 	model: advancedModel,
 	temperature: 0,
-	prompt: `Current datetime: {{ currentTime }}
+	context: {
+		getCurrentTime: () => new Date().toISOString()
+	},
+	prompt: `Current UTC time: {{ getCurrentTime() }}
+UTC offset at destination: {{ utcOffset }}
+
+Calculate the local time at destination by adding the offset to UTC time.
+For example: if UTC is 22:00 and offset is +1, local time is 23:00.
 
 Parse this time reference: "{{ timeString }}"
 
-Determine how many days from now it represents.
+Determine how many days from now (in destination's local time) it represents:
 - For "today", "now", "currently": 0 days from now
 - For "tonight", "this evening": 0 days from now
 - For "tomorrow": 1 day from now
 - For "day after tomorrow": 2 days from now
-- For specific days like "Monday", "next Friday": calculate days from current date
+- For specific days like "Monday", "next Friday": calculate days from current local date
 - For "this week", "next week": use the nearest relevant date
 
 Return days from now (0-7) and a human-readable interpretation.`,
@@ -33,38 +41,56 @@ Return days from now (0-7) and a human-readable interpretation.`,
 		daysFromNow: z.number().min(0).max(7).describe('Number of days from today (0-7)'),
 		interpretation: z.string().describe('Human-readable interpretation')
 	}),
-	description: 'Interprets natural language time references (like "tomorrow", "next Monday") and calculates days from now.',
+	description: 'Interprets natural language time references relative to the destination timezone.',
 	inputSchema: z.object({
-		currentTime: z.string().describe('Current datetime in ISO format'),
-		timeString: z.string().describe('Natural language time reference')
+		timeString: z.string().describe('Natural language time reference'),
+		utcOffset: z.string().describe('UTC offset at destination (e.g., "+1", "-5")')
 	})
 });
 
 // Tool 2: Convert location name to coordinates
 const geocodeTool = create.Function.asTool({
-	description: 'Converts a location name to coordinates (latitude and longitude).',
+	description: 'Converts a location name to coordinates (latitude, longitude, and UTC offset).',
 	inputSchema: z.object({
 		location: z.string().describe('Location name (e.g., "London", "Paris, France")')
 	}),
-	execute: async ({ location }) => {
-		const response = await fetch(
+	execute: async ({ location }: { location: string }) => {
+		// Get coordinates from Nominatim
+		const geoResponse = await fetch(
 			`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(location)}&format=json&limit=1`,
 			{ headers: { 'User-Agent': 'CasaiWeatherExample/1.0' } }
 		);
 
-		if (!response.ok) {
-			throw new Error(`Geocoding failed: ${response.statusText}`);
+		if (!geoResponse.ok) {
+			throw new Error(`Geocoding failed: ${geoResponse.statusText}`);
 		}
 
-		const data = await response.json() as { lat: string, lon: string, display_name: string }[];
-		if (!Array.isArray(data) || data.length === 0) {
+		const geoData = await geoResponse.json() as { lat: string, lon: string, display_name: string }[];
+		if (!Array.isArray(geoData) || geoData.length === 0) {
 			throw new Error(`Location not found: ${location}`);
 		}
 
+		const lat = parseFloat(geoData[0].lat);
+		const lon = parseFloat(geoData[0].lon);
+
+		// Get timezone offset from Open-Meteo
+		const tzResponse = await fetch(
+			`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m&timezone=auto`
+		);
+
+		if (!tzResponse.ok) {
+			throw new Error(`Timezone fetch failed: ${tzResponse.statusText}`);
+		}
+
+		const tzData = await tzResponse.json() as { utc_offset_seconds: number };
+		const offsetHours = tzData.utc_offset_seconds / 3600;
+		const utcOffset = offsetHours >= 0 ? `+${offsetHours}` : `${offsetHours}`;
+
 		return {
-			lat: parseFloat(data[0].lat),
-			lon: parseFloat(data[0].lon),
-			displayName: data[0].display_name
+			lat,
+			lon,
+			displayName: geoData[0].display_name,
+			utcOffset
 		};
 	}
 });
@@ -129,10 +155,10 @@ const weatherFetchTool = create.Function.asTool({
 const weatherAssistant = create.TextGenerator({
 	model: basicModel,
 	temperature: 0.3,
-	system: `You are a weather assistant. Answer weather questions using these tools:
+	system: `You are a weather assistant. Answer weather questions using these tools in order:
 
-1. If the query mentions time (tomorrow, tonight, next Monday, etc.), use timeInterpreterTool first to get daysFromNow
-2. Use geocodeTool to get coordinates for the location
+1. Use geocodeTool to get coordinates and UTC offset for the location
+2. If the query mentions time (tomorrow, tonight, next Monday, etc.), use timeInterpreterTool with the UTC offset to get daysFromNow
 3. Use weatherFetchTool with the daysFromNow value (0 for current, 1-7 for forecast)
 4. Provide clear, friendly answers with temperature and conditions
 
@@ -140,70 +166,15 @@ Weather data format:
 - Current weather (isForecast=false): has temperature, humidity, precipitation, weatherCode, windSpeed
 - Forecast (isForecast=true): has date, temperatureMax, temperatureMin, precipitation, weatherCode`,
 	tools: { timeInterpreterTool, geocodeTool, weatherFetchTool },
-	stopWhen: stepCountIs(10),
-	/*onStepFinish: ({ toolCalls }) => {
-		toolCalls?.forEach(call =>
-			console.log(`🔧 ${call.toolName}(${JSON.stringify(call.input)})`)
-		);
-	}*/
+	stopWhen: stepCountIs(10)
 });
 
-// Main example
-async function main() {
-	const query = readFileSync(join(__dirname, 'input.txt'), 'utf-8').trim();
-	const currentTime = new Date().toISOString();
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const query = readFileSync(join(__dirname, 'input.txt'), 'utf-8').trim();
 
-	console.log('Weather Intelligence Tools Example');
-	console.log('='.repeat(60));
-	console.log(`Current time: ${currentTime}`);
-	console.log(`Query: ${query}\n`);
+console.log('Weather Intelligence Tools Example');
+console.log(`Query: ${query}\n`);
 
-	const result = (await weatherAssistant(query, { currentTime })).text;
+const result = await weatherAssistant(query);
 
-	console.log(`\nAnswer: ${result}\n`);
-}
-
-// Direct tool testing
-/*async function testToolsDirectly() {
-	const currentTime = new Date().toISOString();
-
-	console.log('\nDirect Tool Testing');
-	console.log('='.repeat(60));
-	console.log(`Current time: ${currentTime}\n`);
-
-	// Test time interpreter
-	const timeResult = await timeInterpreterTool.execute(
-		{ currentTime, timeString: 'tomorrow' },
-		{ toolCallId: 'test-1', messages: [] }
-	);
-	console.log('1. Time interpreter result:', timeResult);
-
-	// Test geocoding
-	const coords = await geocodeTool.execute(
-		{ location: 'London' },
-		{ toolCallId: 'test-2', messages: [] }
-	);
-	console.log('\n2. Geocode result:', coords);
-
-	// Test current weather
-	const currentWeather = await weatherFetchTool.execute(
-		{ lat: coords.lat, lon: coords.lon, daysFromNow: 0 },
-		{ toolCallId: 'test-3', messages: [] }
-	);
-	console.log('\n3. Current weather result:', currentWeather);
-
-	// Test forecast
-	const forecast = await weatherFetchTool.execute(
-		{ lat: coords.lat, lon: coords.lon, daysFromNow: 1 },
-		{ toolCallId: 'test-4', messages: [] }
-	);
-	console.log('\n4. Tomorrow forecast result:', forecast);
-}*/
-
-// Run
-if (require.main === module) {
-	// Uncomment to test tools directly:
-	// testToolsDirectly().then(() => main());
-
-	main().catch(console.error);
-}
+console.log(`\nAnswer: ${result.text}\n`);
