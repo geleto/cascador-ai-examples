@@ -161,20 +161,62 @@ export function withProgressIndicator(
 					const result = await doGenerate();
 					activeCalls--;
 
-					const text = result.content
-						.map(part => {
-							if (part.type === 'text') {
-								return part.text;
+					const textParts: string[] = [];
+					const toolCallMap = new Map<string, string>();
+
+					result.content.forEach(part => {
+						if (part.type === 'text') {
+							textParts.push(part.text);
+						} else if (part.type === 'tool-call') {
+							textParts.push(`tool:${part.toolName}`);
+
+							// Store tool call ID for matching with results
+							const toolCallId = part.toolCallId;
+							if (toolCallId) {
+								toolCallMap.set(toolCallId, part.toolName);
 							}
 
-							if (part.type === 'tool-call') {
-								return `tool:${part.toolName}`;
+							// Log tool call with arguments
+							try {
+								// Check for both 'args' and 'input' properties
+								const args = 'args' in part
+									? part.args
+									: ('input' in part ? (part as { input: unknown }).input : undefined);
+								// If args is already a string, use it directly; otherwise stringify
+								const argsStr = args
+									? (typeof args === 'string' ? args : JSON.stringify(args))
+									: '';
+								process.stdout.write(
+									`[${modelName} #${callId}] 🔧 ${part.toolName}(${argsStr})\n`
+								);
+							} catch {
+								process.stdout.write(
+									`[${modelName} #${callId}] 🔧 ${part.toolName}([stringify error])\n`
+								);
 							}
+						} else if (part.type === 'tool-result') {
+							const toolName = part.toolCallId ? toolCallMap.get(part.toolCallId) ?? 'unknown' : 'unknown';
 
-							return undefined;
-						})
-						.filter(Boolean)
-						.join(', ');
+							// Log tool result
+							try {
+								const resultStr = typeof part.result === 'string'
+									? part.result
+									: JSON.stringify(part.result);
+								const preview = resultStr.length > 100
+									? resultStr.substring(0, 100) + '...'
+									: resultStr;
+								process.stdout.write(
+									`[${modelName} #${callId}] ✅ ${toolName} → ${preview}\n`
+								);
+							} catch {
+								process.stdout.write(
+									`[${modelName} #${callId}] ✅ ${toolName} → [stringify error]\n`
+								);
+							}
+						}
+					});
+
+					const text = textParts.join(', ');
 
 					logCompletion(
 						modelName,
@@ -211,38 +253,137 @@ export function withProgressIndicator(
 					throw error;
 				}
 
-				const { stream: originalStream, ... rest } = streamResult;
+				const { stream: originalStream, ...rest } = streamResult;
 
 				let fullText = '';
 				const toolNames = new Set<string>();
+				const toolInputs = new Map<string, string>();
+				const toolCallIds = new Map<string, string>();
+				const loggedToolCalls = new Set<string>();
+
 				const transformStream = new TransformStream<LanguageModelV2StreamPart, LanguageModelV2StreamPart>({
 					transform(chunk: LanguageModelV2StreamPart, controller) {
-						if (chunk.type === 'text-delta') {
-							fullText += chunk.delta;
-						} else if (chunk.type === 'tool-call') {
-							toolNames.add(chunk.toolName);
-						} else if (chunk.type === 'tool-input-start') {
-							toolNames.add(chunk.toolName);
-						}
+						try {
+							if (chunk.type === 'text-delta') {
+								fullText += chunk.delta;
+							} else if (chunk.type === 'tool-call') {
+								toolNames.add(chunk.toolName);
 
-						controller.enqueue(chunk);
+								// Store tool call ID for matching with results
+								const toolCallId = chunk.toolCallId;
+								if (toolCallId) {
+									toolCallIds.set(toolCallId, chunk.toolName);
+								}
 
-						if (chunk.type === 'finish') {
-							activeCalls--;
+								const callKey = toolCallId ? `${chunk.toolName}-${toolCallId}` : `${chunk.toolName}-default`;
+								if (!loggedToolCalls.has(callKey)) {
+									loggedToolCalls.add(callKey);
 
-							const toolLog = Array.from(toolNames)
-								.map(name => `tool:${name}`)
-								.join(', ');
+									// Log tool call with arguments
+									try {
+										// Check for both 'args' and 'input' properties
+										const args = 'args' in chunk
+											? chunk.args
+											: ('input' in chunk ? (chunk as { input: unknown }).input : undefined);
+										// If args is already a string, use it directly; otherwise stringify
+										const argsStr = args
+											? (typeof args === 'string' ? args : JSON.stringify(args))
+											: '';
+										process.stdout.write(
+											`[${modelName} #${callId}] 🔧 ${chunk.toolName}(${argsStr})\n`
+										);
+									} catch {
+										process.stdout.write(
+											`[${modelName} #${callId}] 🔧 ${chunk.toolName}([stringify error])\n`
+										);
+									}
+								}
+							} else if (chunk.type === 'tool-input-start') {
+								toolNames.add(chunk.toolName);
+								toolCallIds.set(chunk.id, chunk.toolName);
+								toolInputs.set(chunk.id, '');
+							} else if (chunk.type === 'tool-input-delta') {
+								const currentInput = toolInputs.get(chunk.id) ?? '';
+								toolInputs.set(chunk.id, currentInput + chunk.delta);
+							} else if (chunk.type === 'tool-input-end') {
+								const toolName = toolCallIds.get(chunk.id);
+								if (toolName) {
+									const callKey = `${toolName}-${chunk.id}`;
+									if (!loggedToolCalls.has(callKey)) {
+										loggedToolCalls.add(callKey);
+										const input = toolInputs.get(chunk.id);
+										if (input) {
+											process.stdout.write(
+												`[${modelName} #${callId}] 🔧 ${toolName}(${input})\n`
+											);
+										} else {
+											process.stdout.write(
+												`[${modelName} #${callId}] 🔧 ${toolName}()\n`
+											);
+										}
+									}
+									// Clean up input but keep toolCallIds for matching results
+									toolInputs.delete(chunk.id);
+								}
+							} else if (chunk.type === 'tool-result') {
+								const toolName = toolCallIds.get(chunk.toolCallId) ?? 'unknown';
 
-							let logText = fullText;
-							if (fullText && toolLog) {
-								logText += `, ${toolLog}`;
-							} else if (toolLog) {
-								logText = toolLog;
+								// Log tool result
+								try {
+									const resultStr = typeof chunk.result === 'string'
+										? chunk.result
+										: JSON.stringify(chunk.result);
+									const preview = resultStr.length > 100
+										? resultStr.substring(0, 100) + '...'
+										: resultStr;
+									process.stdout.write(
+										`[${modelName} #${callId}] ✅ ${toolName} → ${preview}\n`
+									);
+								} catch {
+									process.stdout.write(
+										`[${modelName} #${callId}] ✅ ${toolName} → [stringify error]\n`
+									);
+								}
 							}
 
-							logCompletion(modelName, callId, startTime, chunk.usage, 'streaming', activeCalls, logText);
+							controller.enqueue(chunk);
+
+							if (chunk.type === 'finish') {
+								activeCalls--;
+
+								const toolLog = Array.from(toolNames)
+									.map(name => `tool:${name}`)
+									.join(', ');
+
+								let logText = fullText;
+								if (fullText && toolLog) {
+									logText += `, ${toolLog}`;
+								} else if (toolLog) {
+									logText = toolLog;
+								}
+
+								logCompletion(modelName, callId, startTime, chunk.usage, 'streaming', activeCalls, logText);
+
+								// Cleanup maps
+								toolInputs.clear();
+								toolCallIds.clear();
+								loggedToolCalls.clear();
+							}
+						} catch (error) {
+							// Log unexpected errors during chunk processing
+							process.stdout.write(
+								`[${modelName} #${callId}] ⚠️  Error processing chunk: ${error instanceof Error ? error.message : 'unknown'}\n`
+							);
+							// Still enqueue the chunk to avoid breaking the stream
+							controller.enqueue(chunk);
 						}
+					},
+
+					flush() {
+						// Cleanup on stream end if not finished normally
+						toolInputs.clear();
+						toolCallIds.clear();
+						loggedToolCalls.clear();
 					}
 				});
 
