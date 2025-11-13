@@ -23,8 +23,9 @@ import { create, FileSystemLoader } from 'casai';
 import { z } from 'zod';
 import { fileURLToPath } from 'url';
 import inputData from './input.json';
+import * as types from './types';
 
-// 1. Define model configurations
+// Define model configurations
 const quickConfig = create.Config({
 	model: basicModel,
 	temperature: 0.4,
@@ -35,54 +36,11 @@ const analyticalConfig = create.Config({
 	temperature: 0.7,
 });
 
-// 2. Schemas - only where structure needed
-
-const StockListSchema = z.object({
-	stocks: z.array(z.object({
-		companyName: z.string(),
-		ticker: z.string(),
-	})),
-});
-
-const ComponentScoresSchema = z.object({
-	criteriaAlignment: z.number().min(0).max(10),
-	financialStrength: z.number().min(0).max(10),
-	growthPotential: z.number().min(0).max(10),
-	marketPosition: z.number().min(0).max(10),
-	contrarianScore: z.number().min(0).max(10),
-	riskLevel: z.number().min(0).max(10),
-});
-
-// Derive type from schema
-type ComponentScores = z.infer<typeof ComponentScoresSchema>;
-
-// Reuse scores inside stock analysis (rank is kept out initially)
-const StockAnalysisSchema = ComponentScoresSchema.extend({
-	ticker: z.string(),
-	companyName: z.string(),
-	market: z.string(),
-	analysis: z.string(),
-	finalScore: z.number(),
-});
-
-// This is what we finally return from JS after ranking
-const RankedStockAnalysisSchema = StockAnalysisSchema.extend({
-	rank: z.number(),
-});
-
-const StockAnalysisResultSchema = z.object({
-	markets: z.array(z.string()),
-	total: z.number(),
-	analyzed: z.number(),
-	skipped: z.number(),
-	topStocks: z.array(RankedStockAnalysisSchema),
-});
-
-// 2b. Shared loader for all templates (instead of path)
+// Shared loader for all templates (instead of path)
 const templatesDir = fileURLToPath(new URL('./templates', import.meta.url));
 const templateLoader = new FileSystemLoader(templatesDir);
 
-// 3. Define generators - all loading from templates folder
+// Define generators - all loading from templates folder
 
 const marketIdentifier = create.ObjectGenerator.loadsTemplate({
 	loader: templateLoader,
@@ -95,7 +53,7 @@ const marketIdentifier = create.ObjectGenerator.loadsTemplate({
 const stockFinder = create.ObjectGenerator.loadsTemplate({
 	loader: templateLoader,
 	output: 'object',
-	schema: StockListSchema,
+	schema: types.StockListSchema,
 	prompt: 'find-stocks.md',
 }, analyticalConfig);
 
@@ -112,11 +70,11 @@ const analysisWriter = create.TextGenerator.loadsTemplate({
 const componentScorer = create.ObjectGenerator.loadsTemplate({
 	loader: templateLoader,
 	output: 'object',
-	schema: ComponentScoresSchema,
+	schema: types.ComponentScoresSchema,
 	prompt: 'score-components.md',
 }, analyticalConfig);
 
-// 4. Load text templates
+// Load text templates
 
 const investmentContextTemplate = create.Template.loadsTemplate({
 	loader: templateLoader,
@@ -128,7 +86,7 @@ const outputTemplate = create.Template.loadsTemplate({
 	template: 'output.txt',
 });
 
-// 5. JS helper functions (with proper types)
+// JS helper functions (with proper types)
 // Now it THROWS so Cascada can detect with `is error` in the script
 async function fetchYahooFinance(ticker: string): Promise<string> {
 	const response = await fetch(`https://finance.yahoo.com/quote/${ticker}/`);
@@ -139,50 +97,21 @@ async function fetchYahooFinance(ticker: string): Promise<string> {
 	return html.substring(0, 50000);
 }
 
-function calculateFinalScore(scores: ComponentScores): number {
+function calculateFinalScore(scores: types.ComponentScores): number {
 	return (
-		scores.criteriaAlignment * 0.30 +
-		scores.financialStrength * 0.20 +
+		scores.criteriaAlignment * 0.3 +
+		scores.financialStrength * 0.2 +
 		scores.growthPotential * 0.25 +
 		scores.marketPosition * 0.15 +
-		scores.contrarianScore * 0.10 -
+		scores.contrarianScore * 0.1 -
 		scores.riskLevel * 0.25
 	);
 }
 
-interface StockAnalysis {
-	ticker: string;
-	companyName: string;
-	market: string;
-	analysis: string;
-	finalScore: number;
-	criteriaAlignment: number;
-	financialStrength: number;
-	growthPotential: number;
-	marketPosition: number;
-	contrarianScore: number;
-	riskLevel: number;
-}
-
-interface RankedStockAnalysis extends StockAnalysis {
-	rank: number;
-}
-
-interface Config {
-	marketContext: string;
-	preferCriteria: string;
-	avoidCriteria: string;
-	numMarkets: number;
-	numAdditionalMarkets: number;
-	numStocksPerMarket: number;
-	numTopStocks: number;
-	numMaxStocksPerMarket: number;
-}
-
 // fixed version (no TS typos)
-function rankAndFilter(analyses: StockAnalysis[], config: Config): RankedStockAnalysis[] {
+function rankAndFilter(analyses: types.StockAnalysis[], config: types.Config): types.RankedStockAnalysis[] {
 	const sorted = [...analyses].sort((a, b) => b.finalScore - a.finalScore);
-	const result: RankedStockAnalysis[] = [];
+	const result: types.RankedStockAnalysis[] = [];
 	const marketCounts: Record<string, number> = {};
 
 	for (const stock of sorted) {
@@ -195,13 +124,12 @@ function rankAndFilter(analyses: StockAnalysis[], config: Config): RankedStockAn
 			marketCounts[stock.market] = count + 1;
 		}
 	}
-
 	return result;
 }
 
 // 6. Create the orchestrator script
 const stockAnalysisAgent = create.Script({
-	schema: StockAnalysisResultSchema,
+	schema: types.StockAnalysisResultSchema,
 	context: {
 		config: inputData,
 		marketIdentifier,
@@ -212,30 +140,14 @@ const stockAnalysisAgent = create.Script({
 		investmentContextTemplate,
 		fetchYahooFinance,
 		calculateFinalScore,
-		rankAndFilter,
-		/**
-		 * Logs a message to the console.
-		 * @param object
-		 */
-		log(...objects: any[]) {
-			console.log(
-				'--- LOG ---',
-				objects.map(object => JSON.stringify(object, null, 2)).join(' ')
-			);
-		},
+		rankAndFilter
 	},
-	script: `
-		:data
-
+	script: `:data
 		// Create reusable investment context string
 		var investmentContext = investmentContextTemplate(config)
 
 		// STEP 1: Identify markets (returns string array directly)
-		var markets = marketIdentifier({
-			marketContext: config.marketContext,
-			numMarkets: config.numMarkets,
-			numAdditionalMarkets: config.numAdditionalMarkets
-		}).object
+		var markets = marketIdentifier(config).object
 
 		// STEP 2: Find stocks (parallel per market via for loop)
 		var allStocks = capture :data
@@ -246,33 +158,20 @@ const stockAnalysisAgent = create.Script({
 					investmentContext: investmentContext,
 					numStocksPerMarket: config.numStocksPerMarket
 				}).object.stocks
-				if result is error
-					result = []
-				endif
-				log('Result:', result)
 
-				for stock in result
-					if stock is error
-						var z = log('Stock is error:')
-					else
-						var z = log('Stock:', stock, 'market:', market)
-						var ss = {
-							companyName: stock.companyName,
-							ticker: stock.ticker,
-							market: market
-						}
-						if ss is error
-							var x = log('SS is error:')
-						else
-							var x = log('SS:', ss)
-							@data.push(ss)
+				if result is not error
+					for stock in result
+						if stock is not error
+							@data.push({
+								companyName: stock.companyName,
+								ticker: stock.ticker,
+								market: market
+							})
 						endif
-					endif
-				endfor
+					endfor
+				endif
 			endfor
 		endcapture
-
-		var w = log('All stocks:', allStocks)
 
 		// STEP 3: Analyze stocks (parallel via for loop)
 		var analyses = capture :data
@@ -335,11 +234,12 @@ const stockAnalysisAgent = create.Script({
 	`
 });
 
-// 7. Run the agent
+// Run the agent
 console.log('Starting stock analysis agent...\n');
+console.log('Disclaimer: This analysis is for educational purposes only and does not constitute financial advice.\n');
 
 const result = await stockAnalysisAgent();
 
-// 8. Format and print output using template
+// Format and print output using template
 const output = await outputTemplate(result);
 console.log(output);

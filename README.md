@@ -97,14 +97,17 @@ Use the `npm run example` command followed by the example number:
 # Run example 1 (Prompt Chaining)
 npm run example 1
 
-# Run example 3 (Routing)
+# Run example 2 (Routing)
+npm run example 2
+
+# Run example 3 (Parallelization)
 npm run example 3
 
 # Run example 4 (Reflection)
 npm run example 4
 ```
 
-The script automatically finds and executes the matching example directory (e.g., `1-prompt-chaining`, `3-routing`, `4-reflection`).
+The script automatically finds and executes the matching example directory (e.g., `1-prompt-chaining`, `2-routing`, `3-parallelization`, `4-reflection`).
 
 ## Customizing Examples
 
@@ -180,9 +183,13 @@ const agent = create.Script({
 
 Demonstrates breaking down a complex task into a sequence of simpler steps.
 
-### Example 3: Routing (`src/3-routing/`)
+### Example 2: Routing (`src/2-routing/`)
 
 Demonstrates routing different types of inputs to specialized handlers.
+
+### Example 3: Parallelization (`src/3-parallelization/`)
+
+Demonstrates automatic parallel execution through simple for loops.
 
 ### Example 4: Reflection (`src/4-reflection/`)
 
