@@ -30,11 +30,11 @@
       }
     },
     {
-      "name": "Run Example 3",
+      "name": "Run Example 5",
       "type": "node",
       "request": "launch",
       "program": "${workspaceFolder}/scripts/run-example.mjs",
-      "args": ["3"],
+      "args": ["5"],
       "cwd": "${workspaceFolder}",
       "console": "integratedTerminal",
       "internalConsoleOptions": "neverOpen",
