@@ -48,32 +48,58 @@ Return days from now (0-7) and a human-readable interpretation.`,
 	})
 });
 
-// Tool 2: Convert location name to coordinates
+// Tool 2: Convert location name to coordinates, or use server location if not specified
 const geocodeTool = create.Function.asTool({
-	description: 'Converts a location name to coordinates (latitude, longitude, and UTC offset).',
+	description: 'Converts a location name to coordinates (latitude, longitude, and UTC offset). If location is empty or not provided, uses the server\'s location based on IP geolocation.',
 	inputSchema: z.object({
-		location: z.string().describe('Location name (e.g., "London", "Paris, France")')
+		location: z.string().optional().describe('Location name (e.g., "London", "Paris, France"). Leave empty to use server location.')
 	}),
-	execute: async ({ location }: { location: string }) => {
-		// Get coordinates from Nominatim
-		const geoResponse = await fetch(
-			`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(location)}&format=json&limit=1`,
-			{ headers: { 'User-Agent': 'CasaiWeatherExample/1.0' } }
-		);
+	execute: async ({ location }: { location?: string }) => {
+		let lat: number;
+		let lon: number;
+		let displayName: string;
 
-		if (!geoResponse.ok) {
-			throw new Error(`Geocoding failed: ${geoResponse.statusText}`);
+		// If no location specified, use server location via IP geolocation
+		if (!location) {
+			const ipResponse = await fetch('https://ipapi.co/json/');
+
+			if (!ipResponse.ok) {
+				throw new Error(`IP geolocation failed: ${ipResponse.statusText}`);
+			}
+
+			const ipData = await ipResponse.json() as {
+				latitude: number,
+				longitude: number,
+				city: string,
+				region: string,
+				country_name: string
+			};
+
+			lat = ipData.latitude;
+			lon = ipData.longitude;
+			displayName = `${ipData.city}, ${ipData.region}, ${ipData.country_name} (server location)`;
+		} else {
+			// Get coordinates from Nominatim for specified location
+			const geoResponse = await fetch(
+				`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(location)}&format=json&limit=1`,
+				{ headers: { 'User-Agent': 'CasaiWeatherExample/1.0' } }
+			);
+
+			if (!geoResponse.ok) {
+				throw new Error(`Geocoding failed: ${geoResponse.statusText}`);
+			}
+
+			const geoData = await geoResponse.json() as { lat: string, lon: string, display_name: string }[];
+			if (!Array.isArray(geoData) || geoData.length === 0) {
+				throw new Error(`Location not found: ${location}`);
+			}
+
+			lat = parseFloat(geoData[0].lat);
+			lon = parseFloat(geoData[0].lon);
+			displayName = geoData[0].display_name;
 		}
 
-		const geoData = await geoResponse.json() as { lat: string, lon: string, display_name: string }[];
-		if (!Array.isArray(geoData) || geoData.length === 0) {
-			throw new Error(`Location not found: ${location}`);
-		}
-
-		const lat = parseFloat(geoData[0].lat);
-		const lon = parseFloat(geoData[0].lon);
-
-		// Get timezone offset from Open-Meteo
+		// Get timezone offset from Open-Meteo for the determined coordinates
 		const tzResponse = await fetch(
 			`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m&timezone=auto`
 		);
@@ -89,7 +115,7 @@ const geocodeTool = create.Function.asTool({
 		return {
 			lat,
 			lon,
-			displayName: geoData[0].display_name,
+			displayName,
 			utcOffset
 		};
 	}
@@ -158,6 +184,8 @@ const weatherAssistant = create.TextGenerator({
 	system: `You are a weather assistant. Answer weather questions using these tools in order:
 
 1. Use geocodeTool to get coordinates and UTC offset for the location
+   - If the user specifies a location, pass it to geocodeTool
+   - If no location is mentioned, omit the location parameter to use server location
 2. If the query mentions time (tomorrow, tonight, next Monday, etc.), use timeInterpreterTool with the UTC offset to get daysFromNow
 3. Use weatherFetchTool with the daysFromNow value (0 for current, 1-7 for forecast)
 4. Provide clear, friendly answers with temperature and conditions
